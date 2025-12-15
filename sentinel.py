@@ -13,7 +13,7 @@ CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '60'))
 ALLOWED_COUNTRIES = [country.strip() for country in os.getenv('ALLOWED_COUNTRIES', 'ZA').split(',') if country.strip()]
 WHITELIST_IPS = [ip.strip() for ip in os.getenv('WHITELIST_IPS', '').split(',') if ip.strip()]
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_country(ip):
     # Local loopback check
@@ -36,31 +36,60 @@ def parse_status(status_output):
     Returns a list of dicts: {'userid': '12', 'name': 'Player', 'ip': '1.2.3.4'}
     """
     players = []
-    # Regex to capture: # userid "Name" ... ip:port ...
-    # CS2 Status format can vary, but typically:
-    # # 52 "Name" STEAM_1:1:12345 00:15 65 0 active 196.x.x.x:27005
+    # CS2 Status format:
+    # 65281    17:53   33    0     active 786432 196.251.208.21:34862 'Vlerrie'
+    # Format: userid time ping loss state rate ip:port 'name'
     
     lines = status_output.split('\n')
+    in_player_section = False
+    
     for line in lines:
-        if '"' in line and 'active' in line: 
+        # Start parsing after the player section header
+        if '---------players--------' in line:
+            in_player_section = True
+            continue
+        
+        # Stop at #end or empty line after players
+        if in_player_section and ('#end' in line or line.strip() == ''):
+            break
+            
+        if in_player_section and 'active' in line:
             try:
-                # Extract parts
-                parts = line.split()
-                # UserID is usually the second item (after the #)
-                userid = parts[1]
+                # Skip bots (they have "BOT" instead of time)
+                if 'BOT' in line:
+                    logging.debug(f"Skipping bot: {line}")
+                    continue
                 
-                # Extract IP (usually near the end, looks like IP:PORT)
-                ip_port = parts[-1] 
-                if ':' in ip_port:
+                # Skip challenging/connecting players (userid 65535)
+                if line.strip().startswith('65535'):
+                    logging.debug(f"Skipping connecting player: {line}")
+                    continue
+                
+                parts = line.split()
+                
+                # userid is first field
+                userid = parts[0]
+                
+                # Find the IP:PORT (has colon and dots)
+                ip_port = None
+                for part in parts:
+                    if ':' in part and '.' in part:
+                        ip_port = part
+                        break
+                
+                if ip_port:
                     ip = ip_port.split(':')[0]
                     
-                    # Extract Name (Everything between the first quotes)
-                    name_match = re.search(r'"(.*?)"', line)
+                    # Name is in single quotes at the end
+                    name_match = re.search(r"'(.*?)'", line)
                     name = name_match.group(1) if name_match else "Unknown"
-
+                    
                     players.append({'userid': userid, 'name': name, 'ip': ip})
+                    logging.info(f"Parsed player: {name} (ID: {userid}, IP: {ip})")
+                    
             except Exception as e:
                 logging.warning(f"Failed to parse line: {line} - {e}")
+    
     return players
 
 def main():
