@@ -11,7 +11,7 @@ RCON_PORT = int(os.getenv('RCON_PORT', '27015'))
 RCON_PASS = os.getenv('RCON_PASS', 'password')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '60'))
 ALLOWED_COUNTRIES = [country.strip() for country in os.getenv('ALLOWED_COUNTRIES', 'ZA').split(',') if country.strip()]
-WHITELIST_IPS = [ip.strip() for ip in os.getenv('WHITELIST_IPS', '').split(',') if ip.strip()]
+WHITELIST_STEAMIDS = [sid.strip() for sid in os.getenv('WHITELIST_STEAMIDS', '').split(',') if sid.strip()]
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -33,12 +33,12 @@ def get_country(ip):
 def parse_status(status_output):
     """
     Parses CS2 'status' command output.
-    Returns a list of dicts: {'userid': '12', 'name': 'Player', 'ip': '1.2.3.4'}
+    Returns a list of dicts: {'userid': '12', 'name': 'Player', 'ip': '1.2.3.4', 'steamid': 'STEAM_1:0:12345'}
     """
     players = []
-    # CS2 Status format:
-    # 65281    17:53   33    0     active 786432 196.251.208.21:34862 'Vlerrie'
-    # Format: userid time ping loss state rate ip:port 'name'
+    # CS2 Status format example from logs:
+    # "Mayonnaise.<0><[U:1:311970591]><Spectator>"
+    # Line format: userid time ping loss state rate ip:port 'name'
     
     lines = status_output.split('\n')
     in_player_section = False
@@ -86,12 +86,28 @@ def parse_status(status_output):
                     name_match = re.search(r"'(.*?)'", line)
                     name = name_match.group(1) if name_match else "Unknown"
                     
-                    players.append({'userid': userid, 'name': name, 'ip': ip})
+                    players.append({'userid': userid, 'name': name, 'ip': ip, 'steamid': None})
                     
             except Exception as e:
                 logging.warning(f"Failed to parse line: {line} - {e}")
     
     return players
+
+def get_steamid_from_status(client, userid):
+    """
+    Gets Steam ID for a player by checking detailed status output.
+    Steam IDs appear in connection messages in the format [U:1:XXXXXXX]
+    """
+    try:
+        # Use status to get full output which may contain Steam IDs
+        response = client.run(f'status')
+        # Look for Steam ID format [U:1:XXXXXXX] or STEAM_X:X:XXXXX
+        steamid_match = re.search(rf'\[U:1:(\d+)\]', response)
+        if steamid_match:
+            return steamid_match.group(1)
+    except Exception as e:
+        logging.debug(f"Could not get Steam ID for userid {userid}: {e}")
+    return None
 
 def main():
     logging.info("Sentinel Geo-Lock started.")
@@ -111,9 +127,12 @@ def main():
                     ip = player['ip']
                     name = player['name']
                     userid = player['userid']
-
-                    if ip in WHITELIST_IPS:
-                        logging.info(f"Whitelisted: {name} ({ip})")
+                    
+                    # Get Steam ID for whitelist check
+                    steamid = get_steamid_from_status(client, userid)
+                    
+                    if steamid and steamid in WHITELIST_STEAMIDS:
+                        logging.info(f"Whitelisted: {name} (Steam ID: {steamid})")
                         continue
 
                     country = get_country(ip)

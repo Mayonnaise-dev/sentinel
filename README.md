@@ -6,7 +6,7 @@ A Docker-based geo-restriction bot for Counter-Strike 2 servers. Automatically k
 
 - 🌍 Geo-location verification using IP lookup
 - 🔄 Automatic player monitoring and enforcement
-- 🎯 Whitelist support for specific IPs
+- 🎯 Whitelist support for specific Steam IDs
 - 🐳 Dockerized for easy deployment
 - ⚙️ Fully configurable via environment variables
 
@@ -40,7 +40,7 @@ Edit `.env` file:
 | `RCON_PASS` | RCON password | `password` |
 | `CHECK_INTERVAL` | Check frequency (seconds) | `60` |
 | `ALLOWED_COUNTRIES` | Comma-separated country codes (e.g., `ZA,US`) | `ZA` |
-| `WHITELIST_IPS` | Comma-separated IPs to allow | `` |
+| `WHITELIST_STEAMIDS` | Comma-separated Steam IDs to allow (e.g., `12345678,87654321`) | `` |
 
 ## Requirements
 
