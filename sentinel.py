@@ -71,6 +71,8 @@ def main():
             with RCON((RCON_HOST, RCON_PORT), RCON_PASS) as rcon:
                 response = rcon.execute('status')
                 players = parse_status(response)
+
+                logging.info(f"Currently {len(players)} players connected.")
                 
                 if not players:
                     logging.info("Server is empty.")
