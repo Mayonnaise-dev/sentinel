@@ -16,9 +16,9 @@ WHITELIST_IPS = [ip.strip() for ip in os.getenv('WHITELIST_IPS', '').split(',') 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_country(ip):
-    # Local loopback check
+    # Local loopback check - return first allowed country for local IPs
     if ip.startswith('192.168.') or ip.startswith('10.') or ip == '127.0.0.1':
-        return ALLOWED_COUNTRIES
+        return ALLOWED_COUNTRIES[0] if ALLOWED_COUNTRIES else 'ZA'
     
     try:
         # Using ip-api.com (Free for non-commercial, 45 req/min limit)
@@ -132,7 +132,6 @@ def main():
                         logging.info(f"  -> KICKING {name} (IP: {ip}, Country: {country})")
                         with Client(RCON_HOST, RCON_PORT, passwd=RCON_PASS, timeout=5) as kick_client:
                             kick_client.run(f'kickid {userid} "Sorry, your country is not allowed to play on this server."')
-                        rcon.execute(f'kickid {userid} "Sorry, your country is not allowed to play on this server."')
                     elif country in ALLOWED_COUNTRIES:
                         logging.info(f"  -> {name} verified from {country}")
                     else:
