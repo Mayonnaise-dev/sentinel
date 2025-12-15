@@ -53,16 +53,20 @@ def parse_status(status_output):
         if in_player_section and ('#end' in line or line.strip() == ''):
             break
             
-        if in_player_section and 'active' in line:
+        if in_player_section and line.strip():
+            # Skip header line
+            if 'id     time ping loss' in line:
+                continue
+                
             try:
                 # Skip bots (they have "BOT" instead of time)
                 if 'BOT' in line:
                     logging.debug(f"Skipping bot: {line}")
                     continue
                 
-                # Skip challenging/connecting players (userid 65535)
+                # Skip challenging players (userid 65535)
                 if line.strip().startswith('65535'):
-                    logging.debug(f"Skipping connecting player: {line}")
+                    logging.debug(f"Skipping challenging player: {line}")
                     continue
                 
                 parts = line.split()
