@@ -39,7 +39,7 @@ Edit `.env` file:
 | `RCON_PORT` | RCON port | `27015` |
 | `RCON_PASS` | RCON password | `password` |
 | `CHECK_INTERVAL` | Check frequency (seconds) | `60` |
-| `ALLOWED_COUNTRIES` | Comma-separated country codes | `` |
+| `ALLOWED_COUNTRIES` | Comma-separated country codes (e.g., `ZA,US`) | `ZA` |
 | `WHITELIST_IPS` | Comma-separated IPs to allow | `` |
 
 ## Requirements
