@@ -3,7 +3,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install dependencies
-RUN pip install python-valve requests
+RUN pip install rcon requests
 
 # Copy the script
 COPY sentinel.py .

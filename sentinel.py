@@ -3,7 +3,7 @@ import re
 import requests
 import os
 import logging
-from valve.rcon import RCON
+from rcon.source import Client
 
 # Configuration via Environment Variables
 RCON_HOST = os.getenv('RCON_HOST', '192.168.1.50')
@@ -71,9 +71,10 @@ def main():
     while True:
         try:
             logging.info("Connecting to RCON...")
-            with RCON((RCON_HOST, RCON_PORT), RCON_PASS) as rcon:
+            with Client(RCON_HOST, RCON_PORT, passwd=RCON_PASS, timeout=10) as client:
                 logging.info("RCON connected. Executing 'status' command...")
-                response = rcon.execute('status')
+                response = client.run('status')
+                logging.info(f"Received response ({len(response)} bytes)")
                 logging.debug(f"Raw RCON response:\n{response}")
                 
                 players = parse_status(response)
@@ -94,9 +95,10 @@ def main():
                         continue
 
                     country = get_country(ip)
-                    
                     if country and country not in ALLOWED_COUNTRIES:
                         logging.info(f"  -> KICKING {name} (IP: {ip}, Country: {country})")
+                        with Client(RCON_HOST, RCON_PORT, passwd=RCON_PASS, timeout=5) as kick_client:
+                            kick_client.run(f'kickid {userid} "Sorry, your country is not allowed to play on this server."')
                         rcon.execute(f'kickid {userid} "Sorry, your country is not allowed to play on this server."')
                     elif country in ALLOWED_COUNTRIES:
                         logging.info(f"  -> {name} verified from {country}")
