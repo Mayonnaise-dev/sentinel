@@ -65,39 +65,48 @@ def parse_status(status_output):
 
 def main():
     logging.info("Sentinel Geo-Lock started.")
+    logging.info(f"Configuration: RCON_HOST={RCON_HOST}, RCON_PORT={RCON_PORT}, CHECK_INTERVAL={CHECK_INTERVAL}s")
+    logging.info(f"Allowed Countries: {ALLOWED_COUNTRIES}")
     
     while True:
         try:
+            logging.info("Connecting to RCON...")
             with RCON((RCON_HOST, RCON_PORT), RCON_PASS) as rcon:
+                logging.info("RCON connected. Executing 'status' command...")
                 response = rcon.execute('status')
+                logging.debug(f"Raw RCON response:\n{response}")
+                
                 players = parse_status(response)
-
-                logging.info(f"Currently {len(players)} players connected.")
+                logging.info(f"Parsed {len(players)} players from status output.")
                 
                 if not players:
-                    logging.info("Server is empty.")
+                    logging.info("No players detected on server.")
                 
                 for player in players:
                     ip = player['ip']
                     name = player['name']
                     userid = player['userid']
+                    
+                    logging.info(f"Checking player: {name} (ID: {userid}, IP: {ip})")
 
                     if ip in WHITELIST_IPS:
+                        logging.info(f"  -> {name} is whitelisted, skipping.")
                         continue
 
                     country = get_country(ip)
                     
                     if country and country not in ALLOWED_COUNTRIES:
-                        logging.info(f"KICKING {name} (IP: {ip}, Country: {country})")
+                        logging.info(f"  -> KICKING {name} (IP: {ip}, Country: {country})")
                         rcon.execute(f'kickid {userid} "Sorry, your country is not allowed to play on this server."')
                     elif country in ALLOWED_COUNTRIES:
-                        logging.info(f"Verified {name} from {country}")
+                        logging.info(f"  -> {name} verified from {country}")
                     else:
-                        logging.warning(f"Could not verify country for {name} ({ip})")
+                        logging.warning(f"  -> Could not verify country for {name} ({ip})")
 
         except Exception as e:
-            logging.error(f"Connection/RCON Error: {e}")
+            logging.error(f"Connection/RCON Error: {e}", exc_info=True)
         
+        logging.info(f"Sleeping for {CHECK_INTERVAL} seconds...")
         time.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
