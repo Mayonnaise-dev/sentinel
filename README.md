@@ -14,7 +14,7 @@ A Docker-based geo-restriction bot for Counter-Strike 2 servers. Automatically k
 
 1. **Clone the repository**
    ```bash
-   git clone <your-repo-url>
+   git clone https://github.com/Mayonnaise-dev/sentinel.git
    cd sentinel
    ```
 
