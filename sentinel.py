@@ -10,6 +10,7 @@ RCON_HOST = os.getenv('RCON_HOST', '192.168.1.50')
 RCON_PORT = int(os.getenv('RCON_PORT', '27015'))
 RCON_PASS = os.getenv('RCON_PASS', 'password')
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '60'))
+PLAYER_POLL_INTERVAL = int(os.getenv('PLAYER_POLL_INTERVAL', '5'))
 ALLOWED_COUNTRIES = [country.strip() for country in os.getenv('ALLOWED_COUNTRIES', 'ZA').split(',') if country.strip()]
 WHITELIST_IPS = [ip.strip() for ip in os.getenv('WHITELIST_IPS', '').split(',') if ip.strip()]
 
@@ -95,25 +96,39 @@ def parse_status(status_output):
 
 def main():
     logging.info("Sentinel Geo-Lock started.")
-    logging.info(f"Configuration: RCON_HOST={RCON_HOST}, RCON_PORT={RCON_PORT}, CHECK_INTERVAL={CHECK_INTERVAL}s")
+    logging.info(f"Configuration: RCON_HOST={RCON_HOST}, RCON_PORT={RCON_PORT}, PLAYER_POLL_INTERVAL={PLAYER_POLL_INTERVAL}s")
     logging.info(f"Allowed Countries: {ALLOWED_COUNTRIES}")
-    
+
+    # Tracks IPs that have already been geo-checked and allowed.
+    # key: ip (str), value: player name (str)
+    known_ips: dict[str, str] = {}
+
     while True:
         try:
             with Client(RCON_HOST, RCON_PORT, passwd=RCON_PASS, timeout=10) as client:
                 response = client.run('status')
                 players = parse_status(response)
-                
-                if not players:
-                    logging.info("No players on server")
-                
+
+                current_ips = {p['ip'] for p in players}
+
+                # Evict IPs of players who have disconnected
+                for ip in list(known_ips.keys()):
+                    if ip not in current_ips:
+                        logging.info(f"Player left: {known_ips[ip]} ({ip})")
+                        del known_ips[ip]
+
+                # Only process players whose IP has not been verified yet
                 for player in players:
                     ip = player['ip']
                     name = player['name']
                     userid = player['userid']
 
+                    if ip in known_ips:
+                        continue
+
                     if ip in WHITELIST_IPS:
                         logging.info(f"Whitelisted: {name} ({ip})")
+                        known_ips[ip] = name
                         continue
 
                     country = get_country(ip)
@@ -123,13 +138,14 @@ def main():
                             kick_client.run(f'kickid {userid}')
                     elif country in ALLOWED_COUNTRIES:
                         logging.info(f"Verified: {name} from {country}")
+                        known_ips[ip] = name
                     else:
-                        logging.warning(f"Could not verify country: {name} ({ip})")
+                        logging.warning(f"Could not verify country for {name} ({ip}), will retry next cycle")
 
         except Exception as e:
             logging.error(f"RCON Error: {e}")
-        
-        time.sleep(CHECK_INTERVAL)
+
+        time.sleep(PLAYER_POLL_INTERVAL)
 
 if __name__ == "__main__":
     main()
